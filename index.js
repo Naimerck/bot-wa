@@ -1,33 +1,30 @@
 import makeWASocket, { useMultiFileAuthState } from '@whiskeysockets/baileys'
-import pino from 'pino'
+import P from 'pino'
 
-const { state, saveCreds } = await useMultiFileAuthState('auth')
+async function startBot() {
+  const { state, saveCreds } = await useMultiFileAuthState('auth')
 
-const sock = makeWASocket({
-  auth: state,
-  logger: pino({ level: 'silent' }),
-})
+  const sock = makeWASocket({
+    logger: P({ level: 'silent' }),
+    auth: state
+  })
 
-sock.ev.on('creds.update', saveCreds)
+  sock.ev.on('connection.update', async (update) => {
+    const { connection } = update
 
-if (!sock.authState.creds.registered) {
+    if (connection === 'open') {
+      console.log('✅ BOT CONECTADO')
+    }
+
+    if (connection === 'close') {
+      console.log('❌ DESCONECTADO')
+    }
+  })
+
   const code = await sock.requestPairingCode('5491134403704')
-  console.log('CODIGO:', code)
+  console.log('📲 CODIGO:', code)
+
+  sock.ev.on('creds.update', saveCreds)
 }
 
-sock.ev.on('messages.upsert', async ({ messages }) => {
-  const msg = messages[0]
-  if (!msg.message) return
-
-  const texto = msg.message.conversation || ''
-
-  if (texto === '!ping') {
-    await sock.sendMessage(msg.key.remoteJid, { text: 'pong 🏓' })
-  }
-
-  if (texto === '!menu') {
-    await sock.sendMessage(msg.key.remoteJid, {
-      text: '🤖 Bot activo\n\n!ping\n!menu'
-    })
-  }
-})
+startBot()
