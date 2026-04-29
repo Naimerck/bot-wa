@@ -1,63 +1,42 @@
-import makeWASocket, { useMultiFileAuthState, DisconnectReason } from '@whiskeysockets/baileys'
-import P from 'pino'
+import makeWASocket, { useMultiFileAuthState } from "@whiskeysockets/baileys"
+import P from "pino"
 import express from "express"
 
-const NUMERO = '5491134403704' // ⚠️ poné tu número
+const NUMERO = "5491134403704"
 
 async function startBot() {
-    const { state, saveCreds } = await useMultiFileAuthState('auth')
+  const { state, saveCreds } = await useMultiFileAuthState("auth")
 
-    const sock = makeWASocket({
-        logger: P({ level: 'silent' }),
-        auth: state,
-    })
+  const sock = makeWASocket({
+    logger: P({ level: "silent" }),
+    auth: state
+  })
 
-    let intervaloCodigo
+  sock.ev.on("connection.update", async (update) => {
+    const { connection } = update
 
-    sock.ev.on('connection.update', async (update) => {
-        const { connection, lastDisconnect } = update
+    if (connection === "open") {
+      console.log("✅ BOT CONECTADO")
+    }
 
-        if (connection === 'connecting') {
-            console.log('🟡 Generando código cada 10 segundos...')
+    if (connection === "close") {
+      console.log("❌ DESCONECTADO")
+    }
+  })
 
-            clearInterval(intervaloCodigo)
+  // 👉 GENERA SOLO UN CÓDIGO
+  const code = await sock.requestPairingCode(NUMERO)
+  console.log("📱 CODIGO:", code)
 
-            intervaloCodigo = setInterval(async () => {
-                try {
-                    const code = await sock.requestPairingCode(NUMERO)
-                    console.log('📱 CODIGO:', code)
-                } catch (e) {}
-            }, 10000)
-        }
-
-        if (connection === 'open') {
-            console.log('✅ BOT CONECTADO')
-            clearInterval(intervaloCodigo)
-        }
-
-        if (connection === 'close') {
-            console.log('❌ DESCONECTADO')
-
-            const shouldReconnect =
-                lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut
-
-            if (shouldReconnect) {
-                console.log('🔄 Reconectando...')
-                startBot()
-            }
-        }
-    })
-
-    sock.ev.on('creds.update', saveCreds)
+  sock.ev.on("creds.update", saveCreds)
 }
 
 startBot()
 
-// 🌐 servidor para Render
 const app = express()
 
 app.get("/", (req, res) => {
-    res.send("Bot activo")
+  res.send("Bot activo")
 })
 
 const PORT = process.env.PORT || 10000
